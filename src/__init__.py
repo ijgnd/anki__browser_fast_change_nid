@@ -174,7 +174,6 @@ def moveNote(self, pos):
     for new, old in changes.items():
         change_nid(new, old)
     self.search()
-    mw.col.modSchema(check=True)  # require full sync (that's what note-organizer does)
     self.mw.requireReset()
     self.model.endReset()
 
@@ -190,11 +189,41 @@ def change_nid(old_nid, new_nid):
     if noteExists(new_nid):
         return
     else:
-        # from note organizer
-        mw.col.db.execute(
-            """update notes set id=? where id = ?""", new_nid, old_nid)
-        mw.col.db.execute(
-            """update cards set nid=? where nid = ?""", new_nid, old_nid)
+        # from glutanimate's note organizer
+        # mw.col.db.execute(
+        #     """update notes set id=? where id = ?""", new_nid, old_nid)
+        # mw.col.db.execute(
+        #     """update cards set nid=? where nid = ?""", new_nid, old_nid)
+
+        """
+        # mw.col.modSchema(check=True)  # this triggers a full sync: 
+        that's what glutanimate's note-organizer from 2017 uses
+        in 2020 Arthur extended Advanced Browser with a nid-change function , see
+        https://github.com/hssm/advanced-browser/commit/7fba8f30f0ebd12b2f458f8a56ec7c6c068ddf24
+        His code doesn't require a full sync (he said in a direct reddit message)
+        https://github.com/hssm/advanced-browser/blob/92ffac0555a5d7058ba0865c63c2e8cb52d8dbc6/advancedbrowser/advancedbrowser/internal_fields.py#L47
+        Arthur's code is:
+            if not askUser(_("Do you really want to change the id of the note ? This may create problems during synchronisation if the note has been modified on another computer.")):
+                        return False
+            old_nid = c.nid
+            n = c.note()
+            cards = n.cards()
+            n.id = value
+            n.flush()
+            for card in cards:
+                card.nid = value
+                card.flush()
+            c.col._remNotes([old_nid])
+        So Arthur just adds "col._remNotes([old_nid])"
+        """
+        n = mw.col.getNote(old_nid)
+        cards = n.cards()
+        n.id = new_nid
+        n.flush()
+        for card in cards:
+            card.nid = new_nid
+            card.flush()
+        mw.col._remNotes([old_nid])
         return new_nid
 
 
@@ -204,10 +233,11 @@ def update_nid(browser):
         tooltip("only select one card (note). Aborting ...")
         return
     cur_card = mw.col.getCard(sel_cids[0])
+    old_nid = cur_card.nid
 
     # TODO: replace with QTimeEdit, so that alternatively I can more human friendly enter time values
     #  https://doc.qt.io/qt-5/qtimeedit.html
-    newstr, ok = getText("new nid", default=str(cur_card.nid))
+    newstr, ok = getText("new nid", default=str(old_nid))
     if not ok: 
         return
     try:
@@ -223,12 +253,11 @@ def update_nid(browser):
     if noteExists(new_nid):
         tooltip("entered value exists. Try again. Aborting ...")
         return        
-    if not askUser(f"Change nid {cur_card.nid} to {new_nid}?"):
+    if not askUser(f"Change nid {old_nid} to {new_nid}?"):
         return
     browser.model.beginReset()
     browser.mw.checkpoint("Rearrange")
-    change_nid(cur_card.nid, new_nid)
+    change_nid(old_nid, new_nid)
     browser.search()
-    mw.col.modSchema(check=True)  # require full sync (that's what note-organizer does)
     browser.mw.requireReset()
     browser.model.endReset()
