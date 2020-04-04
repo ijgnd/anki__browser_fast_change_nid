@@ -26,7 +26,9 @@ from anki.utils import ids2str
 
 from aqt import gui_hooks
 from aqt import mw
-from aqt.qt import *
+from aqt.qt import (
+    QAction
+)
 from aqt.browser import Browser
 from aqt.utils import shortcut, showInfo, tooltip, askUser, getText
 
